@@ -1,5 +1,5 @@
 import {WIDTH,HEIGHT,SPAWN,STOPS,clearLine,distance,findRoute} from './world.mjs';
-import {createCamera,bindCameraGestures} from './camera.mjs';
+import {createCamera,bindCameraGestures} from './camera.mjs?v=zoom-hitboxes';
 import {createSceneMotion} from './scene-motion.mjs';
 
 const $=id=>document.getElementById(id);
