@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#183c34">
+<meta name="description" content="An illustrated, playable lakeside walk through Hanoi.">
+<title>Hồ Tây · An Afternoon in Hanoi</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="game.mjs"></script>
+</head>
+<body>
+<main id="game" aria-label="Hồ Tây exploration game">
+  <canvas id="world" aria-label="West Lake game map"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <div id="markers" aria-label="Places to explore"></div>
+  <header class="hud">
+    <div class="location">
+      <span class="seal" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M20 31c-7 0-13-4-15-11 6-1 12 2 15 9 3-7 9-10 15-9-2 7-8 11-15 11Zm0-3c-5-5-6-11 0-19 6 8 5 14 0 19Z"/><path d="M10 34h20"/></svg></span>
+      <div><div class="eyebrow">HÀ NỘI <span>·</span> VIỆT NAM</div><h1>Hồ Tây</h1><div class="subtitle">An Afternoon in Hanoi</div></div>
+    </div>
+    <nav class="toolbar" aria-label="Game tools">
+      <button id="journal" aria-label="Open journal" title="Journal (J)"><svg viewBox="0 0 24 24"><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1Zm0 0v14M6 8l3 1m6 0 3-1M6 12l3 1m6 0 3-1"/></svg><span>Journal</span></button>
+      <button id="sound" aria-label="Enable lake ambience" aria-pressed="false" title="Toggle ambience"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3Zm13 0 5 6m0-6-5 6" id="speaker"/></svg></button>
+      <button id="help" aria-label="Controls and settings" title="Controls (Esc)"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </nav>
+  </header>
+  <section id="quest" class="quest" aria-label="Current objective">
+    <div class="quest-top"><span class="eyebrow">LAKESIDE WALK</span><span id="count">0 / 3</span></div>
+    <p id="objective">Meet Minh on the promenade.</p>
+    <div class="progress" aria-hidden="true"><i></i><i></i><i></i></div>
+  </section>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <button id="nearby" class="nearby" hidden></button>
+  <div class="key-guide"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</span><span><kbd>E</kbd> Interact</span><span class="pointer-tip">Click to walk</span></div>
+  <div class="touch-ui" aria-label="Touch controls">
+    <div class="dpad">
+      <button data-dir="up" aria-label="Move up">▲</button><button data-dir="left" aria-label="Move left">◀</button><button data-dir="down" aria-label="Move down">▼</button><button data-dir="right" aria-label="Move right">▶</button>
+    </div>
+    <button id="touch-action" aria-label="Interact" disabled><strong>✦</strong><span>Interact</span></button>
+  </div>
+  <button id="map-button" class="map-card" aria-label="Open map" title="Map (M)"><canvas id="minimap" width="300" height="169"></canvas><span>WEST LAKE <b>↗</b></span></button>
+  <dialog id="panel" aria-labelledby="panel-title">
+    <div class="panel-head"><span id="panel-tag" class="eyebrow"></span><button id="close-panel" class="close" aria-label="Close">×</button></div>
+    <h2 id="panel-title"></h2>
+    <div id="panel-content"></div>
+    <div id="panel-actions"></div>
+  </dialog>
+  <div id="loading" class="loading" role="status"><span>HỒ TÂY</span><p>Opening the lakeside path…</p></div>
+</main>
+</body>
+</html>
