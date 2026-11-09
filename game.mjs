@@ -134,9 +134,9 @@ function step(dt) {
   player.phase=player.moving?(player.phase+dt*8)%walkFrames.length:0;
 }
 
-function walkTo(point,stop=null) {
+function walkTo(point,stop=null,snap) {
   if (panel.open) return;
-  const result=findRoute(player,point);
+  const result=findRoute(player,point,snap);
   if (!result) {
     announce('Stay on the promenade or the stone causeway.');
     return;
@@ -267,6 +267,7 @@ function paint() {
   if (!paintedPlayer) drawPlayer();
   updateMarkers();
   drawMap(mini,true);
+  camera.markPainted();
 }
 
 function tick(now) {
@@ -450,13 +451,15 @@ function approach(stop) {
   else walkTo(stop.approach,stop);
 }
 
-function walkPointer(point) {
-  const stop=STOPS.find(item=>distance(point,{x:item.x,y:item.markerY})<28||distance(point,item)<26);
+function walkPointer({point,zoom}) {
+  // Keep the original on-screen hit and snap ranges as the camera zooms.
+  const stop=STOPS.find(item=>distance(point,{x:item.x,y:item.markerY})<28/zoom
+    ||distance(point,item)<26/zoom);
   if (stop) {
     approach(stop);
     return;
   }
-  walkTo(point);
+  walkTo(point,null,40/zoom);
 }
 
 function start() {

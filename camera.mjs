@@ -1,8 +1,9 @@
 const clamp=(value,min,max)=>Math.max(min,Math.min(value,max));
 
 export function createCamera(worldWidth,worldHeight) {
-  const view={w:0,h:0,dpr:1,scale:1,x:0,y:0};
-  let base=1, zoom=1, panX=0, panY=0, ready=false;
+  const view={w:0,h:0,dpr:1,scale:1,x:0,y:0,zoom:1};
+  const painted={x:0,y:0,scale:1,zoom:1};
+  let base=1, panX=0, panY=0, ready=false;
 
   function limits() {
     const w=worldWidth*view.scale,h=worldHeight*view.scale;
@@ -30,17 +31,27 @@ export function createCamera(worldWidth,worldHeight) {
     base=width/height<1.18
       ? Math.max(width/worldWidth,height/worldHeight*.93)
       : Math.min(width/worldWidth,height/worldHeight);
-    view.scale=base*zoom;
+    view.scale=base*view.zoom;
     panX=0;panY=0;ready=false;
     update(player,0);
   }
 
-  const toWorld=point=>({x:(point.x-view.x)/view.scale,y:(point.y-view.y)/view.scale});
+  function toWorld(point,projection=view) {
+    return {x:(point.x-projection.x)/projection.scale,y:(point.y-projection.y)/projection.scale};
+  }
+
+  function presentedTarget(point) {
+    return {point:toWorld(point,painted),zoom:painted.zoom};
+  }
+
+  function markPainted() {
+    Object.assign(painted,{x:view.x,y:view.y,scale:view.scale,zoom:view.zoom});
+  }
 
   function zoomAt(factor,point,previous,player) {
     const anchor=toWorld(previous);
-    zoom=clamp(zoom*factor,1,2.6);
-    view.scale=base*zoom;
+    view.zoom=clamp(view.zoom*factor,1,2.6);
+    view.scale=base*view.zoom;
     view.x=point.x-anchor.x*view.scale;
     view.y=point.y-anchor.y*view.scale;
     limits();
@@ -49,11 +60,11 @@ export function createCamera(worldWidth,worldHeight) {
   }
 
   function reset(player) {
-    zoom=1;view.scale=base;panX=0;panY=0;ready=false;
+    view.zoom=1;view.scale=base;panX=0;panY=0;ready=false;
     update(player,0);
   }
 
-  return {view,resize,update,toWorld,zoomAt,reset};
+  return {view,resize,update,presentedTarget,markPainted,zoomAt,reset};
 }
 
 export function bindCameraGestures(canvas,camera,player,canUse,walk) {
@@ -74,7 +85,7 @@ export function bindCameraGestures(canvas,camera,player,canUse,walk) {
     if(!state) return;
     pointers.delete(event.pointerId);
     if(event.type==='pointerup'&&!gesture&&!state.dragged&&canUse()) {
-      walk(camera.toWorld(pointFor(event)));
+      walk(camera.presentedTarget(pointFor(event)));
     }
     baseline=measure();
     if(!pointers.size) gesture=false;
