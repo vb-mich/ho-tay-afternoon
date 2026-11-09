@@ -1,10 +1,20 @@
-import {WIDTH,HEIGHT,SPAWN,STOPS,walkable,clearLine,distance,findRoute} from './world.mjs';
+import {WIDTH,HEIGHT,SPAWN,STOPS,clearLine,distance,findRoute} from './world.mjs';
+import {createCamera,bindCameraGestures} from './camera.mjs';
+import {createSceneMotion} from './scene-motion.mjs';
 
 const $=id=>document.getElementById(id);
 const canvas=$('world'), ctx=canvas.getContext('2d',{alpha:false});
 const mini=$('minimap');
 const panel=$('panel');
-const art=new Image();
+const art=document.createElement('canvas');
+art.width=WIDTH;
+art.height=HEIGHT;
+const landscape=new Image(), livingScene=new Image();
+const actors=[
+  {stop:STOPS.find(stop=>stop.id==='minh'),frame:0,height:96,phase:.2},
+  {stop:STOPS.find(stop=>stop.id==='lan'),frame:1,height:93,phase:2.1},
+].sort((a,b)=>a.stop.y-b.stop.y);
+let drawSceneMotion;
 const playerAtlas=new Image();
 const spriteRows=[
   {top:0, centers:[226,667,1116,1566], ground:[414,411,414,412]},
@@ -16,8 +26,9 @@ const player={...SPAWN,side:1,back:false,phase:0,moving:false};
 const keys=new Set(), touches=new Map();
 const keyDirs={w:'up',a:'left',s:'down',d:'right',arrowup:'up',arrowleft:'left',arrowdown:'down',arrowright:'right'};
 const speed=188;
-const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const view={w:0,h:0,dpr:1,scale:1,x:0,y:0,ready:false};
+const motionPreference=matchMedia('(prefers-reduced-motion: reduce)');
+const camera=createCamera(WIDTH,HEIGHT);
+const {view}=camera;
 const saveKey='ho-tay-afternoon-v1';
 const questStops=STOPS.filter(stop=>stop.id!=='board');
 const markers=STOPS.map(stop=>{
@@ -66,25 +77,10 @@ function updateQuest() {
 
 function fitCanvas() {
   const {width,height}=canvas.getBoundingClientRect();
-  view.w=width;
-  view.h=height;
-  view.dpr=Math.min(devicePixelRatio||1,2);
-  canvas.width=Math.round(width*view.dpr);
-  canvas.height=Math.round(height*view.dpr);
-  view.scale=width/height<1.18?Math.max(width/WIDTH,height/HEIGHT*.93):Math.min(width/WIDTH,height/HEIGHT);
-  view.ready=false;
-  updateCamera(1);
-}
-
-function updateCamera(dt) {
-  const w=WIDTH*view.scale,h=HEIGHT*view.scale;
-  const clamp=(value,min,max)=>Math.max(min,Math.min(value,max));
-  const x=w<=view.w?(view.w-w)/2:clamp(view.w*.48-player.x*view.scale,view.w-w,0);
-  const y=h<=view.h?(view.h-h)/2:clamp(view.h*.62-player.y*view.scale,view.h-h,0);
-  const t=!view.ready||reduceMotion?1:1-Math.exp(-dt*9);
-  view.x+=(x-view.x)*t;
-  view.y+=(y-view.y)*t;
-  view.ready=true;
+  const dpr=Math.min(devicePixelRatio||1,2);
+  canvas.width=Math.round(width*dpr);
+  canvas.height=Math.round(height*dpr);
+  camera.resize(width,height,dpr,player);
 }
 
 function setPosition(x,y) {
@@ -157,9 +153,29 @@ function oval(context,x,y,rx,ry,color) {
   context.fill();
 }
 
+function drawActor({stop,frame,height,phase}) {
+  const breath=motionPreference.matches?0:Math.sin(elapsed*2+phase);
+  const sway=motionPreference.matches?0:Math.sin(elapsed*1.14+phase);
+  const scale=height/154;
+  ctx.save();
+  ctx.translate(stop.x+13,stop.y-2);
+  ctx.rotate(-.28);
+  oval(ctx,0,0,24,6,'#443e7153');
+  ctx.restore();
+  oval(ctx,stop.x,stop.y,10,3,'#4b394a69');
+
+  ctx.save();
+  ctx.translate(stop.x,stop.y);
+  // The feet stay planted as the upper body shifts with the breathing cycle.
+  ctx.transform(1,0,sway*.018,1+breath*.013,0,0);
+  ctx.drawImage(livingScene,frame*96,132,96,160,
+    -48*scale,-158*scale,96*scale,160*scale);
+  ctx.restore();
+}
+
 function drawPlayer() {
   const row=spriteRows[Number(player.back)];
-  const frame=player.moving&&!reduceMotion?walkFrames[Math.floor(player.phase)]:0;
+  const frame=player.moving&&!motionPreference.matches?walkFrames[Math.floor(player.phase)]:0;
   const width=224, height=426;
   const ground=row.ground[frame];
   ctx.save();
@@ -180,7 +196,7 @@ function drawPlayer() {
 function updateMarkers() {
   for (const {stop,button} of markers) {
     const x=view.x+stop.x*view.scale;
-    const y=view.y+(stop.markerY+(reduceMotion?0:Math.sin(elapsed*2+stop.x)*2))*view.scale;
+    const y=view.y+(stop.markerY+(motionPreference.matches?0:Math.sin(elapsed*2+stop.x)*2))*view.scale;
     button.hidden=x<14||x>view.w-14||y<14||y>view.h-14;
     button.style.left=x+'px';
     button.style.top=y+'px';
@@ -196,9 +212,10 @@ function drawMap(element,frame=false) {
   m.setTransform(sx,0,0,sy,0,0);
   m.drawImage(art,0,0,WIDTH,HEIGHT);
   m.fillStyle='#173f3150';m.fillRect(0,0,WIDTH,HEIGHT);
-  if (frame&&view.w<WIDTH*view.scale) {
+  if (frame&&(view.w<WIDTH*view.scale||view.h<HEIGHT*view.scale)) {
     m.strokeStyle='#fff4d89a';m.lineWidth=9;
-    m.strokeRect(-view.x/view.scale,Math.max(0,-view.y/view.scale),view.w/view.scale,Math.min(HEIGHT,view.h/view.scale));
+    m.strokeRect(Math.max(0,-view.x/view.scale),Math.max(0,-view.y/view.scale),
+      Math.min(WIDTH,view.w/view.scale),Math.min(HEIGHT,view.h/view.scale));
   }
   for (const stop of STOPS) oval(m,stop.x,stop.y,19,19,visited.has(stop.id)?'#86dbc1':'#ffd988');
   oval(m,player.x,player.y,27,27,'#1a443b');
@@ -224,7 +241,8 @@ function updateNearby() {
     button.style.left=Math.min(view.w-78,Math.max(78,x))+'px';
     button.style.top=Math.min(view.h-25,Math.max(145,y))+'px';
   }
-  button.hidden=!stop;
+  button.hidden=!stop||view.x+stop.x*view.scale<0||view.x+stop.x*view.scale>view.w
+    ||view.y+stop.y*view.scale<0||view.y+stop.y*view.scale>view.h;
 }
 
 function paint() {
@@ -232,12 +250,21 @@ function paint() {
   ctx.fillStyle='#174640';ctx.fillRect(0,0,view.w,view.h);
   ctx.translate(view.x,view.y);
   ctx.scale(view.scale,view.scale);
-  ctx.drawImage(art,0,0,WIDTH,HEIGHT);
+  ctx.drawImage(art,0,0);
+  if (!motionPreference.matches) drawSceneMotion(ctx,elapsed);
   if (target) {
     oval(ctx,target.x,target.y,8,4,'#fff0c8b8');
     ctx.strokeStyle='#386657';ctx.lineWidth=1;ctx.stroke();
   }
-  drawPlayer();
+  let paintedPlayer=false;
+  for (const actor of actors) {
+    if (!paintedPlayer&&player.y<actor.stop.y) {
+      drawPlayer();
+      paintedPlayer=true;
+    }
+    drawActor(actor);
+  }
+  if (!paintedPlayer) drawPlayer();
   updateMarkers();
   drawMap(mini,true);
 }
@@ -247,7 +274,7 @@ function tick(now) {
   last=now;
   elapsed+=dt;
   step(dt);
-  updateCamera(dt);
+  camera.update(player,dt,motionPreference.matches);
   updateNearby();
   paint();
   requestAnimationFrame(tick);
@@ -342,6 +369,7 @@ function showHelp() {
   showPanel('help','FIELD GUIDE','How to play');
   paragraph('Move with WASD, the arrow keys, or the on-screen pad. You can also click or tap a path to walk there.');
   paragraph('Approach a person or landmark and press E, choose Interact, or tap its gold marker. Press J for your journal and M for the map.');
+  paragraph('Scroll over the scene or pinch with two fingers to zoom. Use + and − for keyboard zoom, or 0 to reset the view.');
   paragraph('Journal progress stays on this device.');
   action('Resume walk',()=>panel.close(),'primary').focus();
   if (visited.size) action('Reset progress',confirmReset,'secondary danger');
@@ -352,7 +380,7 @@ function confirmReset() {
   paragraph('This clears the journal and returns you to the promenade.');
   action('Keep exploring',showHelp,'primary').focus();
   action('Reset progress',()=>{
-    visited.clear();save();updateQuest();Object.assign(player,SPAWN);view.ready=false;
+    visited.clear();save();updateQuest();Object.assign(player,SPAWN);camera.reset(player);
     panel.close();announce('A new walk begins.');
   },'secondary danger');
 }
@@ -401,6 +429,15 @@ function keyDown(event) {
     event.preventDefault();keys.add(keyDirs[key]);return;
   }
   if (event.repeat) return;
+  if (key==='+'||key==='='||key==='-'||key==='0') {
+    event.preventDefault();
+    if (key==='0') camera.reset(player);
+    else {
+      const center={x:view.w/2,y:view.h/2};
+      camera.zoomAt(key==='-'?1/1.2:1.2,center,center,player);
+    }
+    return;
+  }
   if (key==='e') interact();
   if (key==='j') showJournal();
   if (key==='m') showMap();
@@ -413,10 +450,7 @@ function approach(stop) {
   else walkTo(stop.approach,stop);
 }
 
-function walkPointer(event) {
-  if (event.button!==0) return;
-  const rect=canvas.getBoundingClientRect();
-  const point={x:(event.clientX-rect.left-view.x)/view.scale,y:(event.clientY-rect.top-view.y)/view.scale};
+function walkPointer(point) {
   const stop=STOPS.find(item=>distance(point,{x:item.x,y:item.markerY})<28||distance(point,item)<26);
   if (stop) {
     approach(stop);
@@ -433,7 +467,7 @@ function start() {
   addEventListener('keyup',event=>keys.delete(keyDirs[event.key.toLowerCase()]));
   addEventListener('blur',()=>{keys.clear();touches.clear();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();touches.clear();last=0;}});
-  canvas.addEventListener('pointerup',walkPointer);
+  bindCameraGestures(canvas,camera,player,()=>!panel.open,walkPointer);
   for (const button of document.querySelectorAll('.dpad button')) {
     button.addEventListener('pointerdown',event=>{
       if(event.button!==0)return;
@@ -466,8 +500,17 @@ function loadImage(image,url) {
   return image.decode();
 }
 
-Promise.all([loadImage(art,'west-lake.webp'),loadImage(playerAtlas,'player-atlas.webp')])
-  .then(start)
+Promise.all([loadImage(landscape,'west-lake.webp'),loadImage(playerAtlas,'player-atlas.webp'),
+  loadImage(livingScene,'living-scene.webp')])
+  .then(()=>{
+    const ground=art.getContext('2d',{alpha:false});
+    ground.drawImage(landscape,0,0);
+    // Cover the two figures baked into the original painting with aligned paving.
+    ground.drawImage(livingScene,0,0,112,132,1011,647,112,132);
+    ground.drawImage(livingScene,112,0,81,124,1338,458,81,124);
+    drawSceneMotion=createSceneMotion(art);
+    start();
+  })
   .catch(()=>{
     $('loading').querySelector('p').textContent='The game art could not load. Refresh to try again.';
   });
